@@ -64,6 +64,7 @@ const Banner = () => {
               <Image
                 src={img?.image}
                 alt={img?.title}
+                priority
                 fill
                 className="h-full w-full object-cover"
               />
