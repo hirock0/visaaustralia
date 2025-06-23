@@ -30,7 +30,7 @@ const Banner = () => {
     {
       title: "img-3",
       image:
-        " https://cdn.pixabay.com/photo/2020/06/20/02/42/usa-5319479_960_720.jpg",
+        "https://cdn.pixabay.com/photo/2020/06/20/02/42/usa-5319479_960_720.jpg",
     },
   ];
 
