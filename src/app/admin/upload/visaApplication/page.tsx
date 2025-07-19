@@ -1,9 +1,11 @@
 "use client";
+
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { collection, addDoc } from "firebase/firestore";
-import { db } from "@/utils/firebaseConfig/FirebaseConfig";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { db, storage } from "@/utils/firebaseConfig/FirebaseConfig";
 import { PoppinsFont } from "@/components/fontFamily/FontFamily";
 
 // Utility to get today's formatted date (e.g., June 22, 2025)
@@ -19,6 +21,8 @@ const getFormattedDate = () => {
 const VisaApplicationPage = () => {
   const navigate = useRouter();
   const [pdfBase64, setPdfBase64] = useState<any>("");
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+
   const {
     register,
     handleSubmit,
@@ -34,7 +38,6 @@ const VisaApplicationPage = () => {
     },
   });
 
-  // Handle PDF upload and convert to base64
   const handlePdfUpload = (e: any) => {
     const file = e.target.files[0];
     if (!file || file.type !== "application/pdf") {
@@ -42,25 +45,38 @@ const VisaApplicationPage = () => {
       return;
     }
 
+    setPdfFile(file);
+
     const reader = new FileReader();
     reader.onloadend = () => {
-      setPdfBase64(reader?.result); // base64 string
+      setPdfBase64(reader.result); // only used for preview
     };
     reader.readAsDataURL(file);
   };
 
-  // Handle form submission
   const onSubmit = async (data: any) => {
     try {
+      let pdfURL = null;
+
+      // Upload PDF to Firebase Storage if exists
+      if (pdfFile) {
+        const storageRef = ref(storage, `pdfs/${Date.now()}_${pdfFile.name}`);
+        const snapshot = await uploadBytes(storageRef, pdfFile);
+        pdfURL = await getDownloadURL(snapshot.ref);
+      }
+
+      // Save form data and PDF URL to Firestore
       await addDoc(collection(db, "applications"), {
         ...data,
         submittedBy: "admin",
         submittedAt: new Date(),
-        pdf: pdfBase64 || null,
+        pdfURL: pdfURL || null,
       });
+
       alert("Data uploaded successfully!");
       reset();
       setPdfBase64("");
+      setPdfFile(null);
     } catch (err) {
       console.error("Error uploading data:", err);
     }
@@ -68,9 +84,7 @@ const VisaApplicationPage = () => {
 
   return (
     <div className="max-w-[1440px] w-11/12 mx-auto py-8">
-      <h1
-        className={` ${PoppinsFont.className} text-2xl font-bold mb-6 text-center`}
-      >
+      <h1 className={`${PoppinsFont.className} text-2xl font-bold mb-6 text-center`}>
         Upload Application Data
       </h1>
 
@@ -127,13 +141,15 @@ const VisaApplicationPage = () => {
           <p className="text-red-500 mb-2">Source is required</p>
         )}
 
-        {/* Date (auto-filled) */}
+        {/* Date */}
         <label className="block mb-1">Date</label>
         <input
           {...register("date", { required: true })}
           className="w-full border p-2 mb-4"
         />
-        {errors.date && <p className="text-red-500 mb-2">Date is required</p>}
+        {errors.date && (
+          <p className="text-red-500 mb-2">Date is required</p>
+        )}
 
         {/* PDF Upload */}
         <label className="block mb-1">Upload PDF (optional)</label>
